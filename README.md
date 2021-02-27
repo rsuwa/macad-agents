@@ -7,7 +7,9 @@ Multi-Agent algorithms for Multi-Agent Connected Autonomous Driving using [MACAD
 
 0. `git clone https://github.com/praveen-palanisamy/macad-agents`
 
-1. Build the MACAD-Agents Docker container: `docker build --rm -f macad-agents/Dockerfile -t macad-agents:latest .` If you want to avoid building and running the Docker container, you can follow the instructions in "Running MACAD-Agents witout Docker" section below.
+> If you want to avoid building and running the Docker container, you can follow the instructions in the[Running MACAD-Agents witout Docker](https://github.com/praveen-palanisamy/macad-agents#running-macad-agents-without-docker) section instead and skip the next 2 steps.
+
+1. Build the MACAD-Agents Docker container: `docker build --rm -f macad-agents/Dockerfile -t macad-agents:latest .` 
 
 2. Run the MACAD-Agents training container:
 `bash run.sh`
@@ -28,7 +30,7 @@ Multi-Agent algorithms for Multi-Agent Connected Autonomous Driving using [MACAD
 
 A brief gist of what you need to setup on your host machine is listed below:
 
-https://github.com/praveen-palanisamy/macad-agents/blob/5e0bf86e4175ffd3aabf52ac32016d4050da9cff/run.sh#L8-L12
+https://github.com/praveen-palanisamy/macad-agents/blob/35c06f58b4eb9fa6c390bb5ad87d73c4f6c5d058/run.sh#L8-L12
 
 Where `-e` is equivalent to `export` using the `bash` terminal.
 
