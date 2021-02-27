@@ -7,7 +7,7 @@ Multi-Agent algorithms for Multi-Agent Connected Autonomous Driving using [MACAD
 
 0. `git clone https://github.com/praveen-palanisamy/macad-agents`
 
-1. Build the MACAD-Agents Docker container: `docker build --rm -f macad-agents/Dockerfile -t macad-agents:latest .`
+1. Build the MACAD-Agents Docker container: `docker build --rm -f macad-agents/Dockerfile -t macad-agents:latest .` If you want to avoid building and running the Docker container, you can follow the instructions in "Running MACAD-Agents witout Docker" section below.
 
 2. Run the MACAD-Agents training container:
 `bash run.sh`
@@ -21,6 +21,16 @@ Multi-Agent algorithms for Multi-Agent Connected Autonomous Driving using [MACAD
     - To train multiple agents using IMPALA where the agents communicate/share learned weights, modify the last line in `run.sh` to look like this:
     
       `macad-agents:latest python -m macad_agents.rllib.impala_multiagent_shared_weights.py`
+
+##### Running MACAD-Agents without Docker
+ If you have all the necessary dependencies installed an configured on your host machine, you can run the agent script like shown below:
+`cd macad-agents/src && python -m macad_agents.rllib.ppo_multiagent_shared_weights`
+
+A brief gist of what you need to setup on your host machine is listed below:
+
+https://github.com/praveen-palanisamy/macad-agents/blob/5e0bf86e4175ffd3aabf52ac32016d4050da9cff/run.sh#L8-L12
+
+Where `-e` is equivalent to `export` using the `bash` terminal.
 
 #### Citing
 
