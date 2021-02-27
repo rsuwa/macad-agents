@@ -1,4 +1,5 @@
 import argparse
+import cv2
 from gym.spaces import Box, Discrete
 import ray
 from ray.rllib.agents.impala import impala
@@ -109,12 +110,11 @@ register_env("dm-" + env_name, env_creator)
 # Placeholder to enable use of a custom pre-processor
 class ImagePreproc(Preprocessor):
     def _init_shape(self, obs_space, options):
-        shape = (84, 84, 3)  # Adjust third dim if stacking frames
-        return shape
-        # return gym.spaces.Box(
-        #    low=0.0, high=1.0, shape=self.shape)
+        self.shape = (84, 84, 3)  # Adjust third dim if stacking frames
+        return self.shape
 
     def transform(self, observation):
+        observation = cv2.resize(observation, (self.shape[0], self.shape[1]))
         return observation
 
 

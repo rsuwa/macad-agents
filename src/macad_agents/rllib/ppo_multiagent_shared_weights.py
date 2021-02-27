@@ -1,10 +1,14 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
+
 import argparse
 
-from gym.spaces import Box, Discrete
+import cv2
+import gym
+import macad_gym
 import ray
+from gym.spaces import Box, Discrete
+from macad_agents.rllib.env_wrappers import wrap_deepmind
+from macad_agents.rllib.models import register_mnih15_shared_weights_net
 from ray import tune
 from ray.rllib.agents.ppo.ppo_policy_graph import PPOPolicyGraph
 from ray.rllib.models import ModelCatalog
@@ -12,17 +16,12 @@ from ray.rllib.models.preprocessors import Preprocessor
 from ray.tune import run_experiments
 from ray.tune.registry import register_env
 
-from macad_agents.rllib.env_wrappers import wrap_deepmind
-from macad_agents.rllib.models import register_mnih15_shared_weights_net
-import gym
-import macad_gym
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--num-iters", type=int, default=20)
 parser.add_argument(
     "--num-workers",
-    default=2,
+    default=1,
     type=int,
     help="Num workers (CPU cores) to use")
 parser.add_argument(
@@ -71,10 +70,11 @@ register_env(env_name, lambda config: env_creator(config))
 # Placeholder to enable use of a custom pre-processor
 class ImagePreproc(Preprocessor):
     def _init_shape(self, obs_space, options):
-        shape = (84, 84, 3)  # Adjust third dim if stacking frames
-        return shape
+        self.shape = (84, 84, 3)  # Adjust third dim if stacking frames
+        return self.shape
 
     def transform(self, observation):
+        observation = cv2.resize(observation, (self.shape[0], self.shape[1]))
         return observation
 
 

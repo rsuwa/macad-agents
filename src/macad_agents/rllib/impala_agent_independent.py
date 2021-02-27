@@ -1,19 +1,19 @@
-import os
 import argparse
+import os
 
-from gym.spaces import Box, Discrete
-import ray
-from ray.rllib.agents.impala import impala
-from ray.rllib.models.preprocessors import Preprocessor
-from ray.rllib.models.catalog import ModelCatalog
-import ray.tune as tune
-from ray.tune import register_env
-from ray.rllib.agents.impala.vtrace_policy_graph import VTracePolicyGraph
-
-from macad_agents.rllib.models import register_mnih15_net
-from macad_agents.rllib.env_wrappers import wrap_deepmind
+import cv2
 import gym
 import macad_gym
+import ray
+import ray.tune as tune
+from gym.spaces import Box, Discrete
+from macad_agents.rllib.env_wrappers import wrap_deepmind
+from macad_agents.rllib.models import register_mnih15_net
+from ray.rllib.agents.impala import impala
+from ray.rllib.agents.impala.vtrace_policy_graph import VTracePolicyGraph
+from ray.rllib.models.catalog import ModelCatalog
+from ray.rllib.models.preprocessors import Preprocessor
+from ray.tune import register_env
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -123,12 +123,11 @@ register_env(env_name, lambda config: env_creator(config))
 # Placeholder to enable use of a custom pre-processor
 class ImagePreproc(Preprocessor):
     def _init_shape(self, obs_space, options):
-        shape = (84, 84, 3)  # Adjust third dim if stacking frames
-        return shape
-        # return gym.spaces.Box(
-        #    low=0.0, high=1.0, shape=self.shape)
+        self.shape = (84, 84, 3)  # Adjust third dim if stacking frames
+        return self.shape
 
     def transform(self, observation):
+        observation = cv2.resize(observation, (self.shape[0], self.shape[1]))
         return observation
 
 
@@ -255,8 +254,9 @@ def default_policy():
 
 # Create a debugging friendly instance
 if args.debug:
-    from tqdm import tqdm
     from pprint import pprint
+
+    from tqdm import tqdm
     trainer = impala.ImpalaAgent(
         env="dm-" + env_name,
         # Use independent policy graphs for each agent
