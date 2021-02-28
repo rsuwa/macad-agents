@@ -30,7 +30,7 @@ parser.add_argument(
     help="Disables comet logging. Used for local smoke tests")
 parser.add_argument(
     "--num-workers",
-    default=2,
+    default=1,
     type=int,
     help="Num workers (CPU cores) to use")
 parser.add_argument(
@@ -97,8 +97,9 @@ else:
     register_mnih15_net()
     model_name = "mnih15"
 
-# Used only in debug mode
 env_name = "HomoNcomIndePOIntrxMASS3CTWN3-v0"
+
+# Used only in debug mode
 env = gym.make(env_name)
 env_actor_configs = env.configs
 num_framestack = args.num_framestack
@@ -133,197 +134,161 @@ class ImagePreproc(Preprocessor):
 
 ModelCatalog.register_custom_preprocessor("sq_im_84", ImagePreproc)
 
-# NOTE: The config def here is unused. See agent init args. Config is created
-# during agent init. The below config is just a placeholder for future quick
-# experiments.
-config = {
-    # Model and preprocessor options.
-    "model": {
-        "custom_model": model_name,
-        "custom_options": {
-            # Custom notes for the experiment
-            "notes": {
-                "args": vars(args)
-            },
-        },
-        # NOTE:Wrappers are applied by RLlib if custom_preproc is NOT specified
-        "custom_preprocessor": "sq_im_84",
-        "dim": 84,
-        "free_log_std": False,  # if args.discrete_actions else True,
-        "grayscale": True,
-        # conv_filters to be used with the custom CNN model.
-        # "conv_filters": [[16, [4, 4], 2], [32, [3, 3], 2], [16, [3, 3], 2]]
-    },
-    # preproc_pref is ignored if custom_preproc is specified
-    # "preprocessor_pref": "deepmind",
+if __name__ == "__main__":
+    if args.redis_address is not None:
+        # num_gpus (& num_cpus) must not be provided when connecting to an
+        # existing cluster
+        ray.init(redis_address=args.redis_address)
+    else:
+        ray.init(num_gpus=args.num_gpus)
 
-    # env_config to be passed to env_creator
-    "env_config": env_actor_configs
-}
-# Common Agent config
-config.update({
-    # Discount factor of the MDP
-    "gamma": 0.99,
-    # Number of steps after which the rollout gets cut
-    "horizon": None,
-    # Whether to rollout "complete_episodes" or "truncate_episodes"
-    "batch_mode": "truncate_episodes",
-    # Whether to use a background thread for sampling (slightly off-policy)
-    "sample_async": False,
-    # Which observation filter to apply to the observation
-    "observation_filter": "NoFilter",
-    # Whether to LZ4 compress observations
-    "compress_observations": False,
-    "num_gpus": args.num_gpus
-})
-# Impala specific config
-# From Appendix G in https://arxiv.org/pdf/1802.01561.pdf
-config.update({
-    # V-trace params (see vtrace.py).
-    "vtrace":
-    True,
-    "vtrace_clip_rho_threshold":
-    1.0,
-    "vtrace_clip_pg_rho_threshold":
-    1.0,
-
-    # System params.
-    # Should be divisible by num_envs_per_worker
-    "sample_batch_size":
-    args.sample_bs_per_worker,
-    "train_batch_size":
-    args.train_bs,
-    "min_iter_time_s":
-    10,
-    "num_workers":
-    args.num_workers,
-    # Number of environments to evaluate vectorwise per worker.
-    "num_envs_per_worker":
-    args.envs_per_worker,
-    "num_cpus_per_worker":
-    1,
-    "num_gpus_per_worker":
-    1,
-
-    # Learning params.
-    "grad_clip":
-    40.0,
-    "clip_rewards":
-    True,
-    # either "adam" or "rmsprop"
-    "opt_type":
-    "adam",
-    "lr":
-    6e-4,
-    "lr_schedule": [
-        [0, 0.0006],
-        [20000000, 0.000000000001],  # Anneal linearly to 0 from start 2 end
-    ],
-    # rmsprop considered
-    "decay":
-    0.99,
-    "momentum":
-    0.0,
-    "epsilon":
-    0.1,
-    # balancing the three losses
-    "vf_loss_coeff":
-    0.5,  # Baseline loss scaling
-    "entropy_coeff":
-    -0.01,
-})
-
-# config["env"] = tune.grid_search(["dm-" + env_id for env_id in env_names])
-# config["env"] = tune.grid_search([env_name for env_name in env_names])
-
-if args.redis_address is not None:
-    # num_gpus (& num_cpus) must not be provided when connecting to an
-    # existing cluster
-    ray.init(redis_address=args.redis_address)
-else:
-    ray.init(num_gpus=args.num_gpus)
-
-
-def default_policy():
-    return (VTracePolicyGraph, Box(0.0, 255.0, shape=(84, 84, 3)), Discrete(9),
-            {
-                "gamma": 0.99,
-                "use_lstm": args.use_lstm
-            })
-
-
-# Create a debugging friendly instance
-if args.debug:
-    from pprint import pprint
-
-    from tqdm import tqdm
-    trainer = impala.ImpalaAgent(
-        env="dm-" + env_name,
-        # Use independent policy graphs for each agent
-        config={
-            "multiagent": {
-                "policy_graphs": {
-                    id: default_policy()
-                    for id in env_actor_configs["actors"].keys()
+    # The below agent config is built from scratch (with many defaults) for easy-reference
+    # during experiments/research.
+    agent_config = {
+        # Model and preprocessor options.
+        "model": {
+            "custom_model": model_name,
+            "custom_options": {
+                # Custom notes for the experiment
+                "notes": {
+                    "args": vars(args)
                 },
-                "policy_mapping_fn": lambda agent_id: agent_id,
             },
-            "env_config": env_actor_configs,
-            "num_workers": args.num_workers,
-            "num_envs_per_worker": args.envs_per_worker,
-            "sample_batch_size": args.sample_bs_per_worker,
-            "train_batch_size": args.train_bs
-        })
-    if args.checkpoint_path and os.path.isfile(args.checkpoint_path):
-        trainer.restore(args.checkpoint_path)
-        print("Loaded checkpoint from:{}".format(args.checkpoint_path))
+            # NOTE:Wrappers are applied by RLlib if custom_preproc is NOT specified
+            "custom_preprocessor": "sq_im_84",
+            "dim": 84,
+            "free_log_std": False,  # if args.discrete_actions else True,
+            "grayscale": True,
+            # conv_filters to be used with the custom CNN model.
+            # "conv_filters": [[16, [4, 4], 2], [32, [3, 3], 2], [16, [3, 3], 2]]
+        },
+        # preproc_pref is ignored if custom_preproc is specified
+        # "preprocessor_pref": "deepmind",
 
-    for iter in tqdm(range(args.num_iters), desc="Iters"):
-        results = trainer.train()
-        if iter % 500 == 0:
-            trainer.save("saved_models/multi-carla/" + args.model_arch)
-        pprint(results)
-else:
-    # Unused exp_spec
-    experiment_spec = tune.Experiment(
-        "multi-carla/" + args.model_arch,
-        "IMPALA",
-        # timesteps_total is init with None (not 0) which causes issue
-        # stop={"timesteps_total": args.num_steps},
-        stop={"timesteps_since_restore": args.num_steps},
-        config=config,
-        checkpoint_freq=1000,
-        checkpoint_at_end=True,
-        resources_per_trial={
-            "cpu": 4,
-            "gpu": 1
-        })
+        # env_config to be passed to env_creator
+        "env_config": env_actor_configs
+    }
+    # Common Agent config
+    agent_config.update({
+        # Discount factor of the MDP
+        "gamma": 0.99,
+        # Number of steps after which the rollout gets cut
+        "horizon": None,
+        # Whether to rollout "complete_episodes" or "truncate_episodes"
+        "batch_mode": "truncate_episodes",
+        # Whether to use a background thread for sampling (slightly off-policy)
+        "sample_async": False,
+        # Which observation filter to apply to the observation
+        "observation_filter": "NoFilter",
+        # Whether to LZ4 compress observations
+        "compress_observations": False,
+        "num_gpus": args.num_gpus,
+        "use_lstm": args.use_lstm,
+    })
+    # Impala specific config
+    # From Appendix G in https://arxiv.org/pdf/1802.01561.pdf
+    agent_config.update({
+        # V-trace params (see vtrace.py).
+        "vtrace":
+        True,
+        "vtrace_clip_rho_threshold":
+        1.0,
+        "vtrace_clip_pg_rho_threshold":
+        1.0,
 
-    tune.run_experiments({
-        "MA-Inde-IMPALA-SSUI3CCARLA": {
-            "run": "IMPALA",
-            "env": env_name,
-            "stop": {
-                "training_iteration": args.num_iters
-            },
-            "config": {
-                "log_level": "DEBUG",
-                "num_sgd_iter": 10,  # Enables Experience Replay
+        # System params.
+        # Should be divisible by num_envs_per_worker
+        "sample_batch_size":
+        args.sample_bs_per_worker,
+        "train_batch_size":
+        args.train_bs,
+        "min_iter_time_s":
+        10,
+        "num_workers":
+        args.num_workers,
+        # Number of environments to evaluate vectorwise per worker.
+        "num_envs_per_worker":
+        args.envs_per_worker,
+        "num_cpus_per_worker":
+        1,
+        "num_gpus_per_worker":
+        1,
+
+        # Learning params.
+        "grad_clip":
+        40.0,
+        "clip_rewards":
+        True,
+        # either "adam" or "rmsprop"
+        "opt_type":
+        "adam",
+        "lr":
+        6e-4,
+        "lr_schedule": [
+            [0, 0.0006],
+            [20000000, 0.000000000001],  # Anneal linearly to 0 from start 2 end
+        ],
+        # rmsprop considered
+        "decay":
+        0.99,
+        "momentum":
+        0.0,
+        "epsilon":
+        0.1,
+        # balancing the three losses
+        "vf_loss_coeff":
+        0.5,  # Baseline loss scaling
+        "entropy_coeff":
+        -0.01,
+    })
+    # agent_config["env"] = tune.grid_search(["dm-" + env_id for env_id in env_names])
+    # agent_config["env"] = tune.grid_search([env_name for env_name in env_names])
+
+    def gen_policy():
+        return (VTracePolicyGraph, Box(0.0, 255.0, shape=(84, 84, 3)), Discrete(9),
+                agent_config)
+
+
+    # Use independent policy graphs for each agent
+    config = {
+                "env": env_name,
                 "multiagent": {
                     "policy_graphs": {
-                        id: default_policy()
+                        id: gen_policy()
                         for id in env_actor_configs["actors"].keys()
                     },
-                    "policy_mapping_fn":
-                    tune.function(lambda agent_id: agent_id),
+                    "policy_mapping_fn": tune.function(lambda agent_id: agent_id),
                 },
-                "env_config": env_actor_configs,
-                "num_workers": args.num_workers,
-                "num_envs_per_worker": args.envs_per_worker,
-                "sample_batch_size": args.sample_bs_per_worker,
-                "train_batch_size": args.train_bs
-            },
-            "checkpoint_freq": 500,
-            "checkpoint_at_end": True,
-        }
-    })
+            }
+    # Create a debugging friendly instance
+    if args.debug:
+        from pprint import pprint
+        from tqdm import tqdm
+        trainer = impala.ImpalaAgent(
+            env=env_name, config=config)
+        if args.checkpoint_path and os.path.isfile(args.checkpoint_path):
+            trainer.restore(args.checkpoint_path)
+            print("Loaded checkpoint from:{}".format(args.checkpoint_path))
+
+        for iter in tqdm(range(args.num_iters), desc="Iters"):
+            results = trainer.train()
+            if iter % 500 == 0:
+                trainer.save("saved_models/multi-carla/" + args.model_arch)
+            pprint(results)
+    else:
+        # Unused exp_spec
+        experiment_spec = tune.Experiment(
+            "multi-carla/" + args.model_arch,
+            "IMPALA",
+            # timesteps_total is init with None (not 0) which causes issue
+            # stop={"timesteps_total": args.num_steps},
+            stop={"timesteps_since_restore": args.num_steps},
+            config=config,
+            checkpoint_freq=500,
+            checkpoint_at_end=True,
+            resources_per_trial={
+                "cpu": 2,
+                "gpu": 1
+            })
+
+        tune.run_experiments(experiment_spec)
