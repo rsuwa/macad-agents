@@ -3,7 +3,7 @@
 
 import torch
 import torch.nn as nn
-from .utils import (normalized_columns_initializer, set_init, push_and_pull,
+from .utils import (normalized_columns_initializer, set_init_w, push_and_pull,
                     record)
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -49,7 +49,7 @@ class Net(nn.Module):
                                      self.action_space)
         # Init weights
         # self.apply(weights_init)
-        set_init([
+        set_init_w([
             self.conv1, self.conv2, self.conv3, self.conv4, self.linear,
             self.critic_linear, self.actor_mu, self.actor_sigma
         ])
