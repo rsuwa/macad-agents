@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--num-iters", type=int, default=3000)
 parser.add_argument(
-    "--num-workers", default=1, type=int, help="Num workers (CPU cores) to use"
+    "--num-workers", default=6, type=int, help="Num workers (CPU cores) to use"
 )
 parser.add_argument(
     "--num-gpus", default=1, type=int, help="Number of gpus to use. Default=2"
@@ -89,7 +89,13 @@ if __name__ == "__main__":
     ray.init()
 
     obs_space = Box(0.0, 255.0, shape=(84, 84, 3))
-    # obs_space = Tuple([Box(0.0, 255.0, shape=(84, 84, 3)), Discrete(5), Box(-128.0, 128.0, shape=(2, ))])
+    # obs_space = Tuple(
+    #     [
+    #         Box(0.0, 255.0, shape=(84, 84, 3)),
+    #         Discrete(5),
+    #         Box(-128.0, 128.0, shape=(2,)),
+    #     ]
+    # )
     act_space = Discrete(9)
 
     def gen_policy():
@@ -99,7 +105,7 @@ if __name__ == "__main__":
                 "custom_model": model_name,
                 "custom_options": {
                     # Custom notes for the experiment
-                    "notes": {"notes": args.notes},
+                    "notes": {"notes": args.notes}
                 },
                 # NOTE:Wrappers are applied by RLlib if custom_preproc is NOT
                 # specified
